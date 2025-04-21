@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/fernandofreamunde/ika/internal/user"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -11,7 +13,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// Register routes
 	mux.HandleFunc("/", s.HelloWorldHandler)
-	mux.HandleFunc("/register", s.RegisterUserHandler)
+	mux.HandleFunc("POST /register", s.RegisterUserHandler)
 	mux.HandleFunc("/login", s.LoginHandler)
 	mux.HandleFunc("/new_message", s.NewMessageHandler)
 	mux.HandleFunc("/chatrooms", s.NewChatRoomHandler)
@@ -47,8 +49,19 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{"message": "Register User!"}
-	respondWithJson(resp, 200, w)
+
+	type Parameters struct {
+		Email    string `json:"email"`
+		Nickname string `json:"nickname"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	resp, _ := user.CreateUser(params.Email, params.Password, params.Nickname, r.Context(), s.db.Queries().CreateUser)
+	respondWithJson(resp, 201, w)
 }
 
 func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
