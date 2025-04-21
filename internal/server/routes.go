@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
 )
 
@@ -59,8 +60,20 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := Parameters{}
 	_ = decoder.Decode(&params)
+	hpw, err := auth.HashPassword(params.Password)
+	if err != nil {
+		resp := map[string]string{"message": "Something whent wrong processing the request!"}
+		respondWithJson(resp, 500, w)
+	}
 
-	resp, _ := user.CreateUser(params.Email, params.Password, params.Nickname, r.Context(), s.db.Queries().CreateUser)
+	resp, err := user.CreateUser(params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
+	if err != nil {
+		resp := map[string]string{"message": err.Error()}
+		log.Println(err)
+		respondWithJson(resp, 422, w)
+		return
+	}
+
 	respondWithJson(resp, 201, w)
 }
 

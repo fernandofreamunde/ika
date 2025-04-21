@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/fernandofreamunde/ika/internal/db"
@@ -18,8 +19,12 @@ type User struct {
 	// RefreshToken string    `json:"refresh_token"`
 }
 
-func CreateUser(email string, nick string, password string, ctx context.Context, createUser func(ctx context.Context, arg db.CreateUserParams) (db.User, error)) (User, error) {
+func CreateUser(email string, nick string, password string, ctx context.Context, dbq func() *db.Queries) (User, error) {
 	id, _ := uuid.NewUUID()
+
+	if email == "" || password == "" || nick == "" {
+		return User{}, fmt.Errorf("email, password and nickname are mandatory fields!")
+	}
 
 	data := db.CreateUserParams{
 		ID:             id,
@@ -27,7 +32,12 @@ func CreateUser(email string, nick string, password string, ctx context.Context,
 		Nickname:       nick,
 		HashedPassword: password,
 	}
-	dbuser, err := createUser(ctx, data)
+
+	_, err := dbq().FindUserByEmail(ctx, email)
+	if err == nil {
+		return User{}, fmt.Errorf("User with this email already exists!")
+	}
+	dbuser, err := dbq().CreateUser(ctx, data)
 
 	if err != nil {
 		return User{}, err
