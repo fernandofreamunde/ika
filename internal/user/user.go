@@ -19,6 +19,41 @@ type User struct {
 	// RefreshToken string    `json:"refresh_token"`
 }
 
+func UpdateUser(dbUser db.User, email string, nick string, password string, ctx context.Context, dbq func() *db.Queries) (User, error) {
+
+	if email == "" {
+		email = dbUser.Email
+	}
+
+	if nick == "" {
+		nick = dbUser.Nickname
+	}
+
+	if password == "" {
+		password = dbUser.HashedPassword
+	}
+
+	data := db.UpdateUserParams{
+		Email:          email,
+		Nickname:       nick,
+		HashedPassword: password,
+		ID:             dbUser.ID,
+	}
+
+	updatedUser, err := dbq().UpdateUser(ctx, data)
+	if err != nil {
+		return User{}, err
+	}
+
+	return User{
+		ID:        updatedUser.ID,
+		Email:     updatedUser.Email,
+		Nickname:  updatedUser.Nickname,
+		CreatedAt: updatedUser.CreatedAt,
+		UpdatedAt: updatedUser.UpdatedAt,
+	}, nil
+}
+
 func CreateUser(email string, nick string, password string, ctx context.Context, dbq func() *db.Queries) (User, error) {
 	id, _ := uuid.NewUUID()
 

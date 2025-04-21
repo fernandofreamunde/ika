@@ -15,6 +15,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Register routes
 	//mux.HandleFunc("GET /", s.HelloWorldHandler)
 	mux.HandleFunc("POST /api/users", s.RegisterUserHandler)
+	mux.HandleFunc("PUT /api/users", s.UpdateUserHandler)
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
@@ -46,6 +47,45 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"message": "Hello World"}
+	respondWithJson(resp, 200, w)
+}
+
+func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+
+	type Parameters struct {
+		Email    string `json:"email"`
+		Nickname string `json:"nickname"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	var hpw string
+	var err error
+	if params.Password == "" {
+		hpw = ""
+	} else {
+		hpw, err = auth.HashPassword(params.Password)
+	}
+
+	if err != nil {
+		resp := map[string]string{"message": "Something whent wrong processing the request!"}
+		respondWithJson(resp, 500, w)
+		return
+	}
+
+	// TODO: add getting the user from token.
+	u, _ := s.db.Queries().FindUserByEmail(r.Context(), params.Email)
+	resp, err := user.UpdateUser(u, params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
+	if err != nil {
+		resp := map[string]string{"message": err.Error()}
+		log.Println(err)
+		respondWithJson(resp, 422, w)
+		return
+	}
+
 	respondWithJson(resp, 200, w)
 }
 
@@ -103,7 +143,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp, _ := auth.AuthenticateUser(dbUser)
 
-	// Todo: create refresh token table
+	// TODO: create refresh token table
 	//_, err = s..queries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
 	//	Token:     resp.refreshToken,
 	//	UpdatedAt: time.Now(),
