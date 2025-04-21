@@ -91,7 +91,7 @@ func (q *Queries) NukeUsers(ctx context.Context) error {
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET email = $1, hashed_password = $2, nickname = $3, updated_at = NOW()
-WHERE id = $3
+WHERE id = $4
 RETURNING id, created_at, updated_at, hashed_password, nickname, email
 `
 
@@ -99,10 +99,16 @@ type UpdateUserParams struct {
 	Email          string
 	HashedPassword string
 	Nickname       string
+	ID             uuid.UUID
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser, arg.Email, arg.HashedPassword, arg.Nickname)
+	row := q.db.QueryRowContext(ctx, updateUser,
+		arg.Email,
+		arg.HashedPassword,
+		arg.Nickname,
+		arg.ID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,

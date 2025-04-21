@@ -15,6 +15,6 @@ SELECT * FROM users WHERE id = $1;
 -- name: UpdateUser :one
 UPDATE users
 SET email = $1, hashed_password = $2, nickname = $3, updated_at = NOW()
-WHERE id = $3
+WHERE id = $4
 RETURNING *;
 
