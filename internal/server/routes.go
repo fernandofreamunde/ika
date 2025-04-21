@@ -13,13 +13,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux := http.NewServeMux()
 
 	// Register routes
-	mux.HandleFunc("/", s.HelloWorldHandler)
-	mux.HandleFunc("POST /register", s.RegisterUserHandler)
-	mux.HandleFunc("/login", s.LoginHandler)
-	mux.HandleFunc("/new_message", s.NewMessageHandler)
-	mux.HandleFunc("/chatrooms", s.NewChatRoomHandler)
+	//mux.HandleFunc("GET /", s.HelloWorldHandler)
+	mux.HandleFunc("POST /api/users", s.RegisterUserHandler)
+	mux.HandleFunc("POST /api/login", s.LoginHandler)
+	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
+	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
 
-	mux.HandleFunc("/health", s.healthHandler)
+	mux.HandleFunc("GET /api/health", s.healthHandler)
 
 	// Wrap the mux with CORS middleware
 	return s.corsMiddleware(mux)
@@ -64,6 +64,7 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		resp := map[string]string{"message": "Something whent wrong processing the request!"}
 		respondWithJson(resp, 500, w)
+		return
 	}
 
 	resp, err := user.CreateUser(params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
