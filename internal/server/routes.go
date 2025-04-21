@@ -7,6 +7,7 @@ import (
 
 	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
+	"github.com/google/uuid"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -15,7 +16,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Register routes
 	//mux.HandleFunc("GET /", s.HelloWorldHandler)
 	mux.HandleFunc("POST /api/users", s.RegisterUserHandler)
-	mux.HandleFunc("PUT /api/users", s.UpdateUserHandler)
+	mux.HandleFunc("PUT /api/users/{userID}", s.UpdateUserHandler)
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
@@ -57,13 +58,12 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		Nickname string `json:"nickname"`
 		Password string `json:"password"`
 	}
-
+	userID, err := uuid.Parse(r.PathValue("userID"))
 	decoder := json.NewDecoder(r.Body)
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
 	var hpw string
-	var err error
 	if params.Password == "" {
 		hpw = ""
 	} else {
@@ -76,8 +76,21 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: add getting the user from token.
-	u, _ := s.db.Queries().FindUserByEmail(r.Context(), params.Email)
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	if userID != userId {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	u, _ := s.db.Queries().FindUserById(r.Context(), userId)
 	resp, err := user.UpdateUser(u, params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
 	if err != nil {
 		resp := map[string]string{"message": err.Error()}

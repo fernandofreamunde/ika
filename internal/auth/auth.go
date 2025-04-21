@@ -34,6 +34,7 @@ func CheckPasswordHash(hash, pw string) error {
 func AuthenticateUser(u db.User) (LoginResponse, error) {
 
 	expiresIn := 60 * 60
+	// TODO: .env APP_SECRET
 	jwt, _ := MakeJWT(u.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
 	refreshToken, _ := MakeRefreshToken()
 
