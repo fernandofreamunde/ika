@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
@@ -102,35 +101,17 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresIn := 60 * 60
-	jwt, err := auth.MakeJWT(dbUser.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
-	//refreshToken, _ := auth.MakeRefreshToken()
+	resp, _ := auth.AuthenticateUser(dbUser)
 
+	// Todo: create refresh token table
 	//_, err = s..queries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
-	//	Token:     refreshToken,
+	//	Token:     resp.refreshToken,
 	//	UpdatedAt: time.Now(),
 	//	CreatedAt: time.Now(),
 	//	ExpiresAt: time.Now().Add(time.Duration(60 * 24 * time.Hour)),
 	//	UserID:    uuid.NullUUID{UUID: user.ID, Valid: true},
 	//})
 
-	type loginResponse struct {
-		User         user.User `json:"user"`
-		Token        string    `json:"token"`
-		RefreshToken string    `json:"refresh_token"`
-	}
-
-	resp := loginResponse{
-		User: user.User{
-			ID:        dbUser.ID,
-			Email:     dbUser.Email,
-			Nickname:  dbUser.Nickname,
-			CreatedAt: dbUser.CreatedAt,
-			UpdatedAt: dbUser.UpdatedAt,
-		},
-		Token:        jwt,
-		RefreshToken: "asdfasdf",
-	}
 	respondWithJson(resp, 200, w)
 }
 

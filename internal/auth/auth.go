@@ -8,10 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fernandofreamunde/ika/internal/db"
+	"github.com/fernandofreamunde/ika/internal/user"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type LoginResponse struct {
+	User         user.User `json:"user"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+}
 
 func HashPassword(pw string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
@@ -21,6 +29,25 @@ func HashPassword(pw string) (string, error) {
 
 func CheckPasswordHash(hash, pw string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw))
+}
+
+func AuthenticateUser(u db.User) (LoginResponse, error) {
+
+	expiresIn := 60 * 60
+	jwt, _ := MakeJWT(u.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	refreshToken, _ := MakeRefreshToken()
+
+	return LoginResponse{
+		User: user.User{
+			ID:        u.ID,
+			Email:     u.Email,
+			Nickname:  u.Nickname,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
+		},
+		Token:        jwt,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
