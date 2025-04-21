@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fernandofreamunde/ika/internal/db"
+	idb "github.com/fernandofreamunde/ika/internal/db"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -22,10 +24,12 @@ type Service interface {
 	// Close terminates the database connection.
 	// It returns an error if the connection cannot be closed.
 	Close() error
+	Queries() *db.Queries
 }
 
 type service struct {
-	db *sql.DB
+	db  *sql.DB
+	qdb *idb.Queries
 }
 
 var (
@@ -45,11 +49,13 @@ func New() Service {
 	}
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
 	db, err := sql.Open("pgx", connStr)
+	adb := idb.New(db)
 	if err != nil {
 		log.Fatal(err)
 	}
 	dbInstance = &service{
-		db: db,
+		db:  db,
+		qdb: adb,
 	}
 	return dbInstance
 }
@@ -112,4 +118,8 @@ func (s *service) Health() map[string]string {
 func (s *service) Close() error {
 	log.Printf("Disconnected from database: %s", database)
 	return s.db.Close()
+}
+
+func (s *service) Queries() *db.Queries {
+	return s.qdb
 }
