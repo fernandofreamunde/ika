@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"ika/internal/database"
+	"github.com/fernandofreamunde/ika/internal/database"
 )
 
 type Server struct {

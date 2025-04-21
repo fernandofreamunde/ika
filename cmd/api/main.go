@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"ika/internal/server"
+	"github.com/fernandofreamunde/ika/internal/server"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
