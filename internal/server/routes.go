@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
@@ -79,7 +80,57 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{"message": "Login User!"}
+	type Parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	dbUser, err := s.db.Queries().FindUserByEmail(r.Context(), params.Email)
+
+	if err != nil {
+		respondSimpleMessage("Incorrect email of password", 401, w)
+		return
+	}
+
+	e := auth.CheckPasswordHash(dbUser.HashedPassword, params.Password)
+	if e != nil {
+		respondSimpleMessage("Incorrect email of password", 401, w)
+		return
+	}
+
+	expiresIn := 60 * 60
+	jwt, err := auth.MakeJWT(dbUser.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	//refreshToken, _ := auth.MakeRefreshToken()
+
+	//_, err = s..queries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+	//	Token:     refreshToken,
+	//	UpdatedAt: time.Now(),
+	//	CreatedAt: time.Now(),
+	//	ExpiresAt: time.Now().Add(time.Duration(60 * 24 * time.Hour)),
+	//	UserID:    uuid.NullUUID{UUID: user.ID, Valid: true},
+	//})
+
+	type loginResponse struct {
+		User         user.User `json:"user"`
+		Token        string    `json:"token"`
+		RefreshToken string    `json:"refresh_token"`
+	}
+
+	resp := loginResponse{
+		User: user.User{
+			ID:        dbUser.ID,
+			Email:     dbUser.Email,
+			Nickname:  dbUser.Nickname,
+			CreatedAt: dbUser.CreatedAt,
+			UpdatedAt: dbUser.UpdatedAt,
+		},
+		Token:        jwt,
+		RefreshToken: "asdfasdf",
+	}
 	respondWithJson(resp, 200, w)
 }
 
@@ -103,6 +154,11 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(resp); err != nil {
 		log.Printf("Failed to write response: %v", err)
 	}
+}
+
+func respondSimpleMessage(message string, statusCode int, w http.ResponseWriter) {
+	resp := map[string]string{"message": message}
+	respondWithJson(resp, statusCode, w)
 }
 
 func respondWithJson(payload interface{}, statusCode int, w http.ResponseWriter) {
