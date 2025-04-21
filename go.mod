@@ -1,4 +1,4 @@
-module ika
+module github.com/fernandofreamunde/ika
 
 go 1.24.0
 
