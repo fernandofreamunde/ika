@@ -1,9 +1,106 @@
 package auth
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+)
 
 func HashPassword(pw string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 
 	return string(bytes), err
+}
+
+func CheckPasswordHash(hash, pw string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw))
+}
+
+func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Issuer:    "chirpy",
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
+		Subject:   userID.String(),
+	})
+
+	return t.SignedString([]byte(tokenSecret))
+}
+
+func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
+
+	t, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpcted signing method: %v", token.Header["alg"])
+		}
+		return []byte(tokenSecret), nil
+	})
+
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("failed to parse token: %v", err)
+	}
+
+	if !t.Valid {
+		return uuid.UUID{}, fmt.Errorf("invalid token")
+	}
+
+	claims, ok := t.Claims.(*jwt.RegisteredClaims)
+
+	if !ok {
+		return uuid.UUID{}, fmt.Errorf("invalid claims")
+	}
+
+	userId, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("invalid uuid")
+	}
+
+	return userId, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+
+	header := headers.Get("Authorization")
+
+	if header == "" {
+		return "", fmt.Errorf("Authorization header not set")
+	}
+
+	if !strings.Contains(header, "Bearer ") {
+		return "", fmt.Errorf("Authorization header is not 'Bearer' token")
+	}
+	return header[7:], nil
+}
+
+func GetApiKey(headers http.Header) (string, error) {
+
+	header := headers.Get("Authorization")
+
+	if header == "" {
+		return "", fmt.Errorf("Authorization header not set")
+	}
+
+	if !strings.Contains(header, "ApiKey ") {
+		return "", fmt.Errorf("Authorization header does not contain 'ApiKey'")
+	}
+	return header[7:], nil
+}
+
+func MakeRefreshToken() (string, error) {
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+	t := hex.EncodeToString([]byte(key))
+	return t, nil
 }
