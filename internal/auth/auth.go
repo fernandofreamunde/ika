@@ -64,6 +64,27 @@ func AuthenticateUser(u db.User, ctx context.Context, dbq func() *db.Queries) (L
 	}, nil
 }
 
+func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (string, error) {
+
+	tokenString, _ := GetBearerToken(h)
+	token, err := q().GetRefreshToken(ctx, tokenString)
+
+	if err != nil {
+		return "", fmt.Errorf("Unauthorized.")
+	}
+
+	if token.ExpiresAt.Before(time.Now()) || token.RevokedAt.Valid {
+		return "", fmt.Errorf("Unauthorized.")
+	}
+
+	expiresIn := 60 * 60
+	jwt, err := MakeJWT(token.UserID.UUID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	if err != nil {
+		return "", fmt.Errorf("Could not create JWT.")
+	}
+	return jwt, nil
+}
+
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{

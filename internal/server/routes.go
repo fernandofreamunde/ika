@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
@@ -110,7 +109,7 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Nickname string `json:"nickname"`
 		Password string `json:"password"`
-	
+	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := Parameters{}
@@ -162,28 +161,20 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) RefreshLoginHandler(w http.ResponseWriter, r *http.Request) {
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	token, err := s.db.Queries().GetRefreshToken(r.Context(), tokenString)
 
+	jwt, err := auth.RefreshJWT(r.Header, r.Context(), s.db.Queries)
 	if err != nil {
+		log.Printf("Unauthorized with error: %v", err)
 		respondSimpleMessage("Unauthorized.", 401, w)
 		return
 	}
 
-	if token.ExpiresAt.Before(time.Now()) || token.RevokedAt.Valid {
-		respondSimpleMessage("Unauthorized.", 401, w)
-		return
-	}
-
-	expiresIn := 60*60
-	jwt, err := auth.MakeJWT(token.UserID.UUID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
-	
 	type Response struct {
 		Token string `json:"token"`
 	}
 
 	respondWithJson(Response{
-		Token : jwt
+		Token: jwt,
 	}, 200, w)
 }
 
