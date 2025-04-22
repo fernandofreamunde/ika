@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/user"
@@ -18,6 +19,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("POST /api/users", s.RegisterUserHandler)
 	mux.HandleFunc("PUT /api/users/{userID}", s.UpdateUserHandler)
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
+	mux.HandleFunc("POST /api/refresh", s.RefreshLoginHandler)
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
 
@@ -108,7 +110,7 @@ func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Nickname string `json:"nickname"`
 		Password string `json:"password"`
-	}
+	
 
 	decoder := json.NewDecoder(r.Body)
 	params := Parameters{}
@@ -157,6 +159,32 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	resp, _ := auth.AuthenticateUser(dbUser, r.Context(), s.db.Queries)
 
 	respondWithJson(resp, 200, w)
+}
+
+func (s *Server) RefreshLoginHandler(w http.ResponseWriter, r *http.Request) {
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	token, err := s.db.Queries().GetRefreshToken(r.Context(), tokenString)
+
+	if err != nil {
+		respondSimpleMessage("Unauthorized.", 401, w)
+		return
+	}
+
+	if token.ExpiresAt.Before(time.Now()) || token.RevokedAt.Valid {
+		respondSimpleMessage("Unauthorized.", 401, w)
+		return
+	}
+
+	expiresIn := 60*60
+	jwt, err := auth.MakeJWT(token.UserID.UUID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	
+	type Response struct {
+		Token string `json:"token"`
+	}
+
+	respondWithJson(Response{
+		Token : jwt
+	}, 200, w)
 }
 
 func (s *Server) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
