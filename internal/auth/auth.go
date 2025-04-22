@@ -85,6 +85,14 @@ func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (strin
 	return jwt, nil
 }
 
+func RvokeRefreshToken(h http.Header, ctx context.Context, q func() *db.Queries) {
+
+	tokenString, _ := GetBearerToken(h)
+	token, _ := q().GetRefreshToken(ctx, tokenString)
+
+	q().RevokeRefreshToken(ctx, token.Token)
+}
+
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{

@@ -19,6 +19,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("PUT /api/users/{userID}", s.UpdateUserHandler)
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
 	mux.HandleFunc("POST /api/refresh", s.RefreshLoginHandler)
+	mux.HandleFunc("POST /api/revoke", s.RevokeLoginHandler)
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
 
@@ -176,6 +177,11 @@ func (s *Server) RefreshLoginHandler(w http.ResponseWriter, r *http.Request) {
 	respondWithJson(Response{
 		Token: jwt,
 	}, 200, w)
+}
+
+func (s *Server) RevokeLoginHandler(w http.ResponseWriter, r *http.Request) {
+	auth.RevokeRefreshToken(r.Header, r.Context(), s.db.Queries)
+	respondSimpleMessage("", 204, w)
 }
 
 func (s *Server) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
