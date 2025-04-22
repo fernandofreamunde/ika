@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -31,12 +32,24 @@ func CheckPasswordHash(hash, pw string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw))
 }
 
-func AuthenticateUser(u db.User) (LoginResponse, error) {
+func AuthenticateUser(u db.User, ctx context.Context, dbq func() *db.Queries) (LoginResponse, error) {
 
 	expiresIn := 60 * 60
 	// TODO: .env APP_SECRET
 	jwt, _ := MakeJWT(u.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
 	refreshToken, _ := MakeRefreshToken()
+
+	_, err := dbq().CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UpdatedAt: time.Now(),
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(time.Duration(60 * 24 * time.Hour)),
+		UserID:    uuid.NullUUID{UUID: u.ID, Valid: true},
+	})
+
+	if err != nil {
+		return LoginResponse{}, fmt.Errorf("Could not create refresh token.")
+	}
 
 	return LoginResponse{
 		User: user.User{

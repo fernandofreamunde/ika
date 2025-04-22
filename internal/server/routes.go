@@ -154,16 +154,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, _ := auth.AuthenticateUser(dbUser)
-
-	// TODO: create refresh token table
-	//_, err = s..queries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
-	//	Token:     resp.refreshToken,
-	//	UpdatedAt: time.Now(),
-	//	CreatedAt: time.Now(),
-	//	ExpiresAt: time.Now().Add(time.Duration(60 * 24 * time.Hour)),
-	//	UserID:    uuid.NullUUID{UUID: user.ID, Valid: true},
-	//})
+	resp, _ := auth.AuthenticateUser(dbUser, r.Context(), s.db.Queries)
 
 	respondWithJson(resp, 200, w)
 }
