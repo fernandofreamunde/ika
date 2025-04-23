@@ -11,6 +11,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type Chatroom struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Type      string
+	Name      sql.NullString
+}
+
+type ChatroomsParticipant struct {
+	ChatroomID    uuid.NullUUID
+	ParticipantID uuid.NullUUID
+}
+
 type RefreshToken struct {
 	Token     string
 	CreatedAt time.Time
