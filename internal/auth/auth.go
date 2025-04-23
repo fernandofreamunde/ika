@@ -85,7 +85,7 @@ func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (strin
 	return jwt, nil
 }
 
-func RvokeRefreshToken(h http.Header, ctx context.Context, q func() *db.Queries) {
+func RevokeRefreshToken(h http.Header, ctx context.Context, q func() *db.Queries) {
 
 	tokenString, _ := GetBearerToken(h)
 	token, _ := q().GetRefreshToken(ctx, tokenString)
