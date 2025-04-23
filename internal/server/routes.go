@@ -1,11 +1,14 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
+	"github.com/fernandofreamunde/ika/internal/db"
 	"github.com/fernandofreamunde/ika/internal/user"
 	"github.com/google/uuid"
 )
@@ -20,8 +23,14 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
 	mux.HandleFunc("POST /api/refresh", s.RefreshLoginHandler)
 	mux.HandleFunc("POST /api/revoke", s.RevokeLoginHandler)
+
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
+
 	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
+	mux.HandleFunc("GET /api/chatrooms", s.NewChatRoomHandler)
+	mux.HandleFunc("GET /api/chatrooms/{chatroomID}", s.NewChatRoomHandler)
+	mux.HandleFunc("PUT /api/chatrooms", s.NewChatRoomHandler)
+	mux.HandleFunc("DELETE /api/chatrooms", s.NewChatRoomHandler)
 
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
@@ -55,6 +64,7 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
+	// TODO: refactor this... check order of events
 	type Parameters struct {
 		Email    string `json:"email"`
 		Nickname string `json:"nickname"`
@@ -187,6 +197,52 @@ func (s *Server) RevokeLoginHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"message": "New Message!"}
 	respondWithJson(resp, 200, w)
+}
+
+func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
+
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	type Parameters struct {
+		FriendID string `json:"friend_id"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+
+	frienID, err := uuid.Parse(params.FriendID)
+	if err != nil {
+		respondSimpleMessage("Invalid Friend ID.", 400, w)
+		return
+	}
+
+	frien, err := s.db.Queries().FindUserById(r.Context(), frienID)
+	if err != nil {
+		log.Printf("Err Finding Fren: %v", err)
+		respondSimpleMessage("Friend not found.", 404, w)
+		return
+	}
+
+	room, err := s.db.Queries().CreateChatroom(r.Context(), db.CreateChatroomParams{
+		Name: sql.NullString{String: fmt.Sprintf("%s:%s", user.Nickname, frien.Nickname), Valid: true},
+		Type: "direct",
+	})
+	if err != nil {
+		log.Printf("Err Creating room: %v", err)
+		respondSimpleMessage("Internal Server Error.", 500, w)
+		return
+	}
+
+	respondWithJson(room, 201, w)
+	// TODO: Test this works before refactoring
 }
 
 func (s *Server) NewChatRoomHandler(w http.ResponseWriter, r *http.Request) {
