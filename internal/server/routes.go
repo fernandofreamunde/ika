@@ -26,7 +26,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 
-	mux.HandleFunc("POST /api/chatrooms", s.NewChatRoomHandler)
+	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
 	mux.HandleFunc("GET /api/chatrooms", s.NewChatRoomHandler)
 	mux.HandleFunc("GET /api/chatrooms/{chatroomID}", s.NewChatRoomHandler)
 	mux.HandleFunc("PUT /api/chatrooms", s.NewChatRoomHandler)
@@ -232,6 +232,7 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	room, err := s.db.Queries().CreateChatroom(r.Context(), db.CreateChatroomParams{
+		ID:   uuid.New(),
 		Name: sql.NullString{String: fmt.Sprintf("%s:%s", user.Nickname, frien.Nickname), Valid: true},
 		Type: "direct",
 	})
