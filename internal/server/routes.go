@@ -27,10 +27,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
 
 	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
-	mux.HandleFunc("GET /api/chatrooms", s.NewChatRoomHandler)
-	mux.HandleFunc("GET /api/chatrooms/{chatroomID}", s.NewChatRoomHandler)
-	mux.HandleFunc("PUT /api/chatrooms", s.NewChatRoomHandler)
-	mux.HandleFunc("DELETE /api/chatrooms", s.NewChatRoomHandler)
+	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
+	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.NewMessageHandler)
 
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
@@ -236,19 +234,54 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 		Name: sql.NullString{String: fmt.Sprintf("%s:%s", user.Nickname, frien.Nickname), Valid: true},
 		Type: "direct",
 	})
+
 	if err != nil {
 		log.Printf("Err Creating room: %v", err)
 		respondSimpleMessage("Internal Server Error.", 500, w)
 		return
 	}
 
+	err = s.db.Queries().ChatroomAddParticipant(r.Context(), db.ChatroomAddParticipantParams{
+		ChatroomID:    uuid.NullUUID{UUID: room.ID, Valid: true},
+		ParticipantID: uuid.NullUUID{UUID: user.ID, Valid: true},
+	})
+	if err != nil {
+		log.Printf("Err Creating room: %v", err)
+		respondSimpleMessage("Internal Server Error.", 500, w)
+		return
+	}
+
+	err = s.db.Queries().ChatroomAddParticipant(r.Context(), db.ChatroomAddParticipantParams{
+		ChatroomID:    uuid.NullUUID{UUID: room.ID, Valid: true},
+		ParticipantID: uuid.NullUUID{UUID: frien.ID, Valid: true},
+	})
+	if err != nil {
+		log.Printf("Err Creating room: %v", err)
+		respondSimpleMessage("Internal Server Error.", 500, w)
+		return
+	}
 	respondWithJson(room, 201, w)
-	// TODO: Test this works before refactoring
 }
 
-func (s *Server) NewChatRoomHandler(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{"message": "Register Chat Rooms!"}
-	respondWithJson(resp, 200, w)
+func (s *Server) GetChatroomsHandler(w http.ResponseWriter, r *http.Request) {
+
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	rooms, err := s.db.Queries().FindUsersChatrooms(r.Context(), uuid.NullUUID{UUID: userId, Valid: true})
+	if err != nil {
+		log.Printf("Err Geting users rooms: %v", err)
+		respondSimpleMessage("Internal Server Error.", 500, w)
+		return
+	}
+
+	log.Printf("Get users rooms: %v", rooms)
+	respondWithJson(rooms, 200, w)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
