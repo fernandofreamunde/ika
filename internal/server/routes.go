@@ -28,7 +28,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
 	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
-	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.NewMessageHandler)
+	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.DeleteChatroomHandler)
 
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
@@ -280,8 +280,21 @@ func (s *Server) GetChatroomsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Get users rooms: %v", rooms)
 	respondWithJson(rooms, 200, w)
+}
+
+func (s *Server) DeleteChatroomHandler(w http.ResponseWriter, r *http.Request) {
+
+	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
+	if err != nil {
+		log.Printf("Room ID not set!")
+		respondSimpleMessage("Bad Request", 400, w)
+		return
+	}
+
+	_ = s.db.Queries().DeleteChatroom(r.Context(), roomID)
+
+	respondSimpleMessage("deleted", 204, w)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
