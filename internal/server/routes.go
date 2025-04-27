@@ -28,7 +28,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
 	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
-	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.DeleteChatroomHandler)
+	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.LeaveChatroomHandler)
 
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
@@ -283,7 +283,7 @@ func (s *Server) GetChatroomsHandler(w http.ResponseWriter, r *http.Request) {
 	respondWithJson(rooms, 200, w)
 }
 
-func (s *Server) DeleteChatroomHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) LeaveChatroomHandler(w http.ResponseWriter, r *http.Request) {
 
 	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
 	if err != nil {
@@ -292,7 +292,18 @@ func (s *Server) DeleteChatroomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = s.db.Queries().DeleteChatroom(r.Context(), roomID)
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	err = s.db.Queries().ChatroomRemoveParticipant(r.Context(), db.ChatroomRemoveParticipantParams{
+		ChatroomID:    uuid.NullUUID{UUID: roomID, Valid: true},
+		ParticipantID: uuid.NullUUID{UUID: userId, Valid: true},
+	})
 
 	respondSimpleMessage("deleted", 204, w)
 }
