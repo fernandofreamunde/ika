@@ -24,6 +24,16 @@ type ChatroomsParticipant struct {
 	ParticipantID uuid.NullUUID
 }
 
+type Message struct {
+	ID         uuid.UUID
+	SentAt     time.Time
+	UpdatedAt  time.Time
+	AuthorID   uuid.NullUUID
+	ChatroomID uuid.NullUUID
+	Type       string
+	Content    sql.NullString
+}
+
 type RefreshToken struct {
 	Token     string
 	CreatedAt time.Time
