@@ -30,6 +30,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
 	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.LeaveChatroomHandler)
 
+	mux.HandleFunc("GET /api/chatrooms/{chatroomID}/messages", s.ReadMessagesHandler)
+	mux.HandleFunc("POST /api/chatrooms/{chatroomID}/messages", s.CreateMessageHandler)
+
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
 	// Wrap the mux with CORS middleware
@@ -306,6 +309,90 @@ func (s *Server) LeaveChatroomHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	respondSimpleMessage("deleted", 204, w)
+}
+
+func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
+
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
+	if err != nil {
+		log.Printf("Room ID not set!")
+		respondSimpleMessage("Bad Request", 400, w)
+		return
+	}
+
+	type Parameters struct {
+		Content string `json:"content"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+
+	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
+	if err != nil {
+		log.Printf("Err Creating room: %v", err)
+		respondSimpleMessage("Chatroom not found.", 404, w)
+		return
+	}
+
+	msg, err := s.db.Queries().CreateMessage(r.Context(), db.CreateMessageParams{
+		ID:         uuid.New(),
+		Type:       "text",
+		AuthorID:   uuid.NullUUID{UUID: user.ID, Valid: true},
+		ChatroomID: uuid.NullUUID{UUID: room.ID, Valid: true},
+		Content:    sql.NullString{String: params.Content, Valid: true},
+	})
+
+	respondWithJson(msg, 201, w)
+}
+
+func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
+
+	tokenString, _ := auth.GetBearerToken(r.Header)
+	// userId
+	_, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	if err != nil {
+		log.Printf("JWT check Failed: %v", err)
+		respondSimpleMessage("Unauthorized", 401, w)
+		return
+	}
+
+	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
+	if err != nil {
+		log.Printf("Room ID not set!")
+		respondSimpleMessage("Bad Request", 400, w)
+		return
+	}
+
+	type Parameters struct {
+		Content string `json:"content"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	params := Parameters{}
+	_ = decoder.Decode(&params)
+
+	// user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+
+	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
+	if err != nil {
+		log.Printf("Err Creating room: %v", err)
+		respondSimpleMessage("Chatroom not found.", 404, w)
+		return
+	}
+
+	// TODO: check if user is participant of room
+	msg, err := s.db.Queries().FindMessagesByRoomById(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
+
+	respondWithJson(msg, 200, w)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
