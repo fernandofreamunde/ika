@@ -66,7 +66,7 @@ func AuthenticateUser(u db.User, ctx context.Context, dbq func() *db.Queries) (L
 
 func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (string, error) {
 
-	tokenString, _ := GetBearerToken(h)
+	tokenString, _ := GetApiKey(h)
 	token, err := q().GetRefreshToken(ctx, tokenString)
 
 	if err != nil {
@@ -87,7 +87,7 @@ func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (strin
 
 func RevokeRefreshToken(h http.Header, ctx context.Context, q func() *db.Queries) {
 
-	tokenString, _ := GetBearerToken(h)
+	tokenString, _ := GetApiKey(h)
 	token, _ := q().GetRefreshToken(ctx, tokenString)
 
 	q().RevokeRefreshToken(ctx, token.Token)
