@@ -24,8 +24,6 @@ func (s *Server) RegisterRoutes() http.Handler {
 	mux.HandleFunc("POST /api/refresh", s.RefreshLoginHandler)
 	mux.HandleFunc("POST /api/revoke", s.RevokeLoginHandler)
 
-	mux.HandleFunc("POST /api/new_message", s.NewMessageHandler)
-
 	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
 	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
 	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.LeaveChatroomHandler)
@@ -46,6 +44,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Credentials", "false") // Set to "true" if credentials are required
+		w.Header().Set("Content-Type", "application/json") // Set to "true" if credentials are required
 
 		// Handle preflight OPTIONS requests
 		if r.Method == http.MethodOptions {
@@ -351,6 +350,7 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		ChatroomID: uuid.NullUUID{UUID: room.ID, Valid: true},
 		Content:    sql.NullString{String: params.Content, Valid: true},
 	})
+	// TODO: handle the errors here...
 
 	respondWithJson(msg, 201, w)
 }
