@@ -56,26 +56,42 @@ func (q *Queries) DeleteMessage(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const findMessagesByRoomById = `-- name: FindMessagesByRoomById :one
+const findMessagesByRoomById = `-- name: FindMessagesByRoomById :many
 SELECT id, sent_at, updated_at, author_id, chatroom_id, type, content 
 FROM messages
 WHERE chatroom_id = $1
 ORDER BY sent_at DESC
 `
 
-func (q *Queries) FindMessagesByRoomById(ctx context.Context, chatroomID uuid.NullUUID) (Message, error) {
-	row := q.db.QueryRowContext(ctx, findMessagesByRoomById, chatroomID)
-	var i Message
-	err := row.Scan(
-		&i.ID,
-		&i.SentAt,
-		&i.UpdatedAt,
-		&i.AuthorID,
-		&i.ChatroomID,
-		&i.Type,
-		&i.Content,
-	)
-	return i, err
+func (q *Queries) FindMessagesByRoomById(ctx context.Context, chatroomID uuid.NullUUID) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, findMessagesByRoomById, chatroomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.SentAt,
+			&i.UpdatedAt,
+			&i.AuthorID,
+			&i.ChatroomID,
+			&i.Type,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateMessage = `-- name: UpdateMessage :one

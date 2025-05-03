@@ -6,7 +6,7 @@ RETURNING *;
 -- name: DeleteMessage :exec
 DELETE FROM messages WHERE id = $1;
 
--- name: FindMessagesByRoomById :one
+-- name: FindMessagesByRoomById :many
 SELECT * 
 FROM messages
 WHERE chatroom_id = $1
