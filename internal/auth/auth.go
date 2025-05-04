@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,8 @@ type LoginResponse struct {
 	RefreshToken string    `json:"refresh_token"`
 }
 
+var appSecret = os.Getenv("APP_SECRET")
+
 func HashPassword(pw string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 
@@ -42,8 +45,7 @@ func CheckPasswordHash(hash, pw string) error {
 func AuthenticateUser(u db.User, ctx context.Context, dbq func() *db.Queries) (LoginResponse, error) {
 
 	expiresIn := 60 * 60
-	// TODO: .env APP_SECRET
-	jwt, _ := MakeJWT(u.ID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	jwt, _ := MakeJWT(u.ID, appSecret, time.Duration(expiresIn)*time.Second)
 	refreshToken, _ := MakeRefreshToken()
 
 	_, err := dbq().CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
@@ -85,7 +87,7 @@ func RefreshJWT(h http.Header, ctx context.Context, q func() *db.Queries) (strin
 	}
 
 	expiresIn := 60 * 60
-	jwt, err := MakeJWT(token.UserID.UUID, "IneedAnAppSecret", time.Duration(expiresIn)*time.Second)
+	jwt, err := MakeJWT(token.UserID.UUID, appSecret, time.Duration(expiresIn)*time.Second)
 	if err != nil {
 		return "", fmt.Errorf("Could not create JWT.")
 	}
