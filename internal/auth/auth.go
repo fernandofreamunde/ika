@@ -114,13 +114,13 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 	return t.SignedString([]byte(tokenSecret))
 }
 
-func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
+func ValidateJWT(tokenString string) (uuid.UUID, error) {
 
 	t, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpcted signing method: %v", token.Header["alg"])
 		}
-		return []byte(tokenSecret), nil
+		return []byte(appSecret), nil
 	})
 
 	if err != nil {

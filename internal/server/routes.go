@@ -66,7 +66,7 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := uuid.Parse(r.PathValue("userID"))
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -172,7 +172,7 @@ func (s *Server) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -238,7 +238,7 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetChatroomsHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -265,7 +265,7 @@ func (s *Server) LeaveChatroomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -283,7 +283,7 @@ func (s *Server) LeaveChatroomHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -329,7 +329,7 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
 	// userId
-	_, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
+	_, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
