@@ -18,13 +18,13 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type UpdateParams struct {
+type UserParams struct {
 	Email    string `json:"email"`
 	Nickname string `json:"nickname"`
 	Password string `json:"password"`
 }
 
-func UpdateUser(dbUser db.User, data UpdateParams, ctx context.Context, dbq func() *db.Queries) (User, error) {
+func UpdateUser(dbUser db.User, data UserParams, ctx context.Context, dbq func() *db.Queries) (User, error) {
 
 	if data.Email == "" {
 		data.Email = dbUser.Email
@@ -66,21 +66,27 @@ func UpdateUser(dbUser db.User, data UpdateParams, ctx context.Context, dbq func
 	}, nil
 }
 
-func CreateUser(email string, nick string, password string, ctx context.Context, dbq func() *db.Queries) (User, error) {
+func CreateUser(params UserParams, ctx context.Context, dbq func() *db.Queries) (User, error) {
 	id, _ := uuid.NewUUID()
 
-	if email == "" || password == "" || nick == "" {
+	if params.Email == "" || params.Password == "" || params.Nickname == "" {
 		return User{}, fmt.Errorf("email, password and nickname are mandatory fields!")
+	}
+
+	var err error
+	params.Password, err = auth.HashPassword(params.Password)
+	if err != nil {
+		return User{}, err
 	}
 
 	data := db.CreateUserParams{
 		ID:             id,
-		Email:          email,
-		Nickname:       nick,
-		HashedPassword: password,
+		Email:          params.Email,
+		Nickname:       params.Nickname,
+		HashedPassword: params.Password,
 	}
 
-	_, err := dbq().FindUserByEmail(ctx, email)
+	_, err = dbq().FindUserByEmail(ctx, params.Email)
 	if err == nil {
 		return User{}, fmt.Errorf("User with this email already exists!")
 	}

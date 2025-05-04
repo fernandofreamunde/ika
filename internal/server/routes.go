@@ -75,13 +75,13 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	if userID != userId {
 		msg := "Can only edit own User Data."
-		log.Printf(msg)
+		log.Print(msg)
 		respondSimpleMessage(msg, 401, w)
 		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	params := user.UpdateParams{}
+	params := user.UserParams{}
 	_ = decoder.Decode(&params)
 
 	u, _ := s.db.Queries().FindUserById(r.Context(), userId)
@@ -98,23 +98,11 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 
-	type Parameters struct {
-		Email    string `json:"email"`
-		Nickname string `json:"nickname"`
-		Password string `json:"password"`
-	}
-
 	decoder := json.NewDecoder(r.Body)
-	params := Parameters{}
+	params := user.UserParams{}
 	_ = decoder.Decode(&params)
-	hpw, err := auth.HashPassword(params.Password)
-	if err != nil {
-		resp := map[string]string{"message": "Something whent wrong processing the request!"}
-		respondWithJson(resp, 500, w)
-		return
-	}
 
-	resp, err := user.CreateUser(params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
+	resp, err := user.CreateUser(params, r.Context(), s.db.Queries)
 	if err != nil {
 		resp := map[string]string{"message": err.Error()}
 		log.Println(err)
