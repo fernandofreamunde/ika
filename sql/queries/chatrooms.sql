@@ -14,6 +14,9 @@ WHERE cp.participant_id = $1;
 -- name: FindChatRoomById :one
 SELECT * FROM chatrooms WHERE id = $1;
 
+-- name: FindParticipantIdsByChatRoomId :many
+SELECT * FROM chatrooms_participants WHERE chatroom_id = $1;
+
 -- name: UpdateChatroom :one
 UPDATE chatrooms
 SET type = $1, name = $2, updated_at = NOW()

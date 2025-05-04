@@ -93,6 +93,33 @@ func (q *Queries) FindChatRoomById(ctx context.Context, id uuid.UUID) (Chatroom,
 	return i, err
 }
 
+const findParticipantIdsByChatRoomId = `-- name: FindParticipantIdsByChatRoomId :many
+SELECT chatroom_id, participant_id FROM chatrooms_participants WHERE chatroom_id = $1
+`
+
+func (q *Queries) FindParticipantIdsByChatRoomId(ctx context.Context, chatroomID uuid.NullUUID) ([]ChatroomsParticipant, error) {
+	rows, err := q.db.QueryContext(ctx, findParticipantIdsByChatRoomId, chatroomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ChatroomsParticipant
+	for rows.Next() {
+		var i ChatroomsParticipant
+		if err := rows.Scan(&i.ChatroomID, &i.ParticipantID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findUsersChatrooms = `-- name: FindUsersChatrooms :many
 SELECT cr.id, cr.created_at, cr.updated_at, cr.type, cr.name FROM chatrooms AS cr 
 LEFT JOIN chatrooms_participants AS cp ON cr.id = cp.chatroom_id
