@@ -44,7 +44,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Credentials", "false") // Set to "true" if credentials are required
-		w.Header().Set("Content-Type", "application/json") // Set to "true" if credentials are required
+		w.Header().Set("Content-Type", "application/json")          // Set to "true" if credentials are required
 
 		// Handle preflight OPTIONS requests
 		if r.Method == http.MethodOptions {
@@ -312,12 +312,12 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		respondSimpleMessage("Chatroom not found.", 404, w)
 		return
 	}
-	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{ UUID: room.ID, Valid: true})
+	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
 
 	in := false
-	for _, p := range(participants) {
+	for _, p := range participants {
 		if p.ParticipantID.UUID.String() == user.ID.String() {
-			in =true
+			in = true
 		}
 	}
 	if !in {
@@ -374,12 +374,12 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		respondSimpleMessage("Chatroom not found.", 404, w)
 		return
 	}
-	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{ UUID: room.ID, Valid: true})
+	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
 
 	in := false
-	for _, p := range(participants) {
+	for _, p := range participants {
 		if p.ParticipantID.UUID.String() == user.ID.String() {
-			in =true
+			in = true
 		}
 	}
 	if !in {
