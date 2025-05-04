@@ -64,30 +64,7 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
-	// TODO: refactor this... check order of events
-	type Parameters struct {
-		Email    string `json:"email"`
-		Nickname string `json:"nickname"`
-		Password string `json:"password"`
-	}
 	userID, err := uuid.Parse(r.PathValue("userID"))
-	decoder := json.NewDecoder(r.Body)
-	params := Parameters{}
-	_ = decoder.Decode(&params)
-
-	var hpw string
-	if params.Password == "" {
-		hpw = ""
-	} else {
-		hpw, err = auth.HashPassword(params.Password)
-	}
-
-	if err != nil {
-		resp := map[string]string{"message": "Something whent wrong processing the request!"}
-		respondWithJson(resp, 500, w)
-		return
-	}
-
 	tokenString, _ := auth.GetBearerToken(r.Header)
 	userId, err := auth.ValidateJWT(tokenString, "IneedAnAppSecret")
 	if err != nil {
@@ -97,13 +74,18 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if userID != userId {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
+		msg := "Can only edit own User Data."
+		log.Printf(msg)
+		respondSimpleMessage(msg, 401, w)
 		return
 	}
 
+	decoder := json.NewDecoder(r.Body)
+	params := user.UpdateParams{}
+	_ = decoder.Decode(&params)
+
 	u, _ := s.db.Queries().FindUserById(r.Context(), userId)
-	resp, err := user.UpdateUser(u, params.Email, params.Nickname, hpw, r.Context(), s.db.Queries)
+	resp, err := user.UpdateUser(u, params, r.Context(), s.db.Queries)
 	if err != nil {
 		resp := map[string]string{"message": err.Error()}
 		log.Println(err)

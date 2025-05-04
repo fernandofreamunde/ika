@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fernandofreamunde/ika/internal/auth"
 	"github.com/fernandofreamunde/ika/internal/db"
 	"github.com/google/uuid"
 )
@@ -15,32 +16,43 @@ type User struct {
 	Nickname  string    `json:"nickname"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	// Token        string    `json:"token"`
-	// RefreshToken string    `json:"refresh_token"`
 }
 
-func UpdateUser(dbUser db.User, email string, nick string, password string, ctx context.Context, dbq func() *db.Queries) (User, error) {
+type UpdateParams struct {
+	Email    string `json:"email"`
+	Nickname string `json:"nickname"`
+	Password string `json:"password"`
+}
 
-	if email == "" {
-		email = dbUser.Email
+func UpdateUser(dbUser db.User, data UpdateParams, ctx context.Context, dbq func() *db.Queries) (User, error) {
+
+	if data.Email == "" {
+		data.Email = dbUser.Email
 	}
 
-	if nick == "" {
-		nick = dbUser.Nickname
+	if data.Nickname == "" {
+		data.Nickname = dbUser.Nickname
 	}
 
-	if password == "" {
-		password = dbUser.HashedPassword
+	var err error
+	if data.Password == "" {
+		data.Password = dbUser.HashedPassword
+	} else {
+		data.Password, err = auth.HashPassword(data.Password)
 	}
 
-	data := db.UpdateUserParams{
-		Email:          email,
-		Nickname:       nick,
-		HashedPassword: password,
+	if err != nil {
+		return User{}, err
+	}
+
+	d := db.UpdateUserParams{
+		Email:          data.Email,
+		Nickname:       data.Nickname,
+		HashedPassword: data.Password,
 		ID:             dbUser.ID,
 	}
 
-	updatedUser, err := dbq().UpdateUser(ctx, data)
+	updatedUser, err := dbq().UpdateUser(ctx, d)
 	if err != nil {
 		return User{}, err
 	}

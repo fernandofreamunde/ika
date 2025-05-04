@@ -10,14 +10,21 @@ import (
 	"time"
 
 	"github.com/fernandofreamunde/ika/internal/db"
-	"github.com/fernandofreamunde/ika/internal/user"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
+type User struct {
+		ID uuid.UUID
+		Email string
+		Nickname string
+		CreatedAt time.Time
+		UpdatedAt time.Time
+	}
+
 type LoginResponse struct {
-	User         user.User `json:"user"`
+	User User `json:"user"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
 }
@@ -52,7 +59,7 @@ func AuthenticateUser(u db.User, ctx context.Context, dbq func() *db.Queries) (L
 	}
 
 	return LoginResponse{
-		User: user.User{
+		User: User {
 			ID:        u.ID,
 			Email:     u.Email,
 			Nickname:  u.Nickname,
