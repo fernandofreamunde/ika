@@ -308,8 +308,21 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
 	if err != nil {
-		log.Printf("Err Creating room: %v", err)
+		log.Printf("Err finding room: %v", err)
 		respondSimpleMessage("Chatroom not found.", 404, w)
+		return
+	}
+	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{ UUID: room.ID, Valid: true})
+
+	in := false
+	for _, p := range(participants) {
+		if p.ParticipantID.UUID.String() == user.ID.String() {
+			in =true
+		}
+	}
+	if !in {
+		log.Printf("User is not a participant")
+		respondSimpleMessage("Use must participate in the chatroom to send messages", 401, w)
 		return
 	}
 
@@ -320,7 +333,11 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		ChatroomID: uuid.NullUUID{UUID: room.ID, Valid: true},
 		Content:    sql.NullString{String: params.Content, Valid: true},
 	})
-	// TODO: handle the errors here...
+	if err != nil {
+		log.Printf("Err creating message: %v", err)
+		respondSimpleMessage("Internal server error", 500, w)
+		return
+	}
 
 	respondWithJson(msg, 201, w)
 }
@@ -328,8 +345,7 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, _ := auth.GetBearerToken(r.Header)
-	// userId
-	_, err := auth.ValidateJWT(tokenString)
+	userId, err := auth.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("JWT check Failed: %v", err)
 		respondSimpleMessage("Unauthorized", 401, w)
@@ -350,7 +366,7 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	// user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
 
 	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
 	if err != nil {
@@ -358,8 +374,19 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		respondSimpleMessage("Chatroom not found.", 404, w)
 		return
 	}
+	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{ UUID: room.ID, Valid: true})
 
-	// TODO: check if user is participant of room
+	in := false
+	for _, p := range(participants) {
+		if p.ParticipantID.UUID.String() == user.ID.String() {
+			in =true
+		}
+	}
+	if !in {
+		log.Printf("User is not a participant")
+		respondSimpleMessage("Use must participate in the chatroom to read messages", 401, w)
+		return
+	}
 	msg, err := s.db.Queries().FindMessagesByRoomById(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
 
 	respondWithJson(msg, 200, w)
