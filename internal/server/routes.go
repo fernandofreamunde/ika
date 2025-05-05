@@ -19,17 +19,17 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Register routes
 	//mux.HandleFunc("GET /", s.HelloWorldHandler)
 	mux.HandleFunc("POST /api/users", s.RegisterUserHandler)
-	mux.HandleFunc("PUT /api/users/{userID}", s.UpdateUserHandler)
+	mux.Handle("PUT /api/users/{userID}", s.authMiddleware(http.HandlerFunc(s.UpdateUserHandler)))
 	mux.HandleFunc("POST /api/login", s.LoginHandler)
 	mux.HandleFunc("POST /api/refresh", s.RefreshLoginHandler)
 	mux.HandleFunc("POST /api/revoke", s.RevokeLoginHandler)
 
-	mux.HandleFunc("POST /api/chatrooms", s.CreateChatroomHandler)
-	mux.HandleFunc("GET /api/chatrooms", s.GetChatroomsHandler)
-	mux.HandleFunc("DELETE /api/chatrooms/{chatroomID}", s.LeaveChatroomHandler)
+	mux.Handle("POST /api/chatrooms", s.authMiddleware(http.HandlerFunc(s.CreateChatroomHandler)))
+	mux.Handle("GET /api/chatrooms", s.authMiddleware(http.HandlerFunc(s.GetChatroomsHandler)))
+	mux.Handle("DELETE /api/chatrooms/{chatroomID}", s.authMiddleware(http.HandlerFunc(s.LeaveChatroomHandler)))
 
-	mux.HandleFunc("GET /api/chatrooms/{chatroomID}/messages", s.ReadMessagesHandler)
-	mux.HandleFunc("POST /api/chatrooms/{chatroomID}/messages", s.CreateMessageHandler)
+	mux.Handle("GET /api/chatrooms/{chatroomID}/messages", s.authMiddleware(http.HandlerFunc(s.ReadMessagesHandler)))
+	mux.Handle("POST /api/chatrooms/{chatroomID}/messages", s.authMiddleware(http.HandlerFunc(s.CreateMessageHandler)))
 
 	mux.HandleFunc("GET /api/health", s.healthHandler)
 
@@ -57,6 +57,23 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString, _ := auth.GetBearerToken(r.Header)
+		userId, err := auth.ValidateJWT(tokenString)
+		if err != nil {
+			log.Printf("JWT check Failed: %v", err)
+			respondSimpleMessage("Unauthorized", 401, w)
+			return
+		}
+
+		s.currentUserId = userId
+
+		// Proceed with the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"message": "Hello World"}
 	respondWithJson(resp, 200, w)
@@ -65,15 +82,8 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := uuid.Parse(r.PathValue("userID"))
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
 
-	if userID != userId {
+	if userID != s.currentUserId {
 		msg := "Can only edit own User Data."
 		log.Print(msg)
 		respondSimpleMessage(msg, 401, w)
@@ -84,7 +94,7 @@ func (s *Server) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	params := user.UserParams{}
 	_ = decoder.Decode(&params)
 
-	u, _ := s.db.Queries().FindUserById(r.Context(), userId)
+	u, _ := s.db.Queries().FindUserById(r.Context(), s.currentUserId)
 	resp, err := user.UpdateUser(u, params, r.Context(), s.db.Queries)
 	if err != nil {
 		resp := map[string]string{"message": err.Error()}
@@ -164,20 +174,7 @@ func (s *Server) RevokeLoginHandler(w http.ResponseWriter, r *http.Request) {
 	respondSimpleMessage("", 204, w)
 }
 
-func (s *Server) NewMessageHandler(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{"message": "New Message!"}
-	respondWithJson(resp, 200, w)
-}
-
 func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
-
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
 
 	type Parameters struct {
 		FriendID string `json:"friend_id"`
@@ -186,7 +183,7 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	currentUser, _ := user.GetUserById(userId.String(), r.Context(), s.db.Queries)
+	currentUser, _ := user.GetUserById(s.currentUserId.String(), r.Context(), s.db.Queries)
 	friend, err := user.GetUserById(params.FriendID, r.Context(), s.db.Queries)
 	if err != nil {
 		log.Printf("Err Finding Fren: %v", err)
@@ -205,15 +202,7 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetChatroomsHandler(w http.ResponseWriter, r *http.Request) {
 
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
-
-	rooms, err := s.db.Queries().FindUsersChatrooms(r.Context(), uuid.NullUUID{UUID: userId, Valid: true})
+	rooms, err := s.db.Queries().FindUsersChatrooms(r.Context(), uuid.NullUUID{UUID: s.currentUserId, Valid: true})
 	if err != nil {
 		log.Printf("Err Geting users rooms: %v", err)
 		respondSimpleMessage("Internal Server Error.", 500, w)
@@ -232,31 +221,15 @@ func (s *Server) LeaveChatroomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
-
 	err = s.db.Queries().ChatroomRemoveParticipant(r.Context(), db.ChatroomRemoveParticipantParams{
 		ChatroomID:    uuid.NullUUID{UUID: roomID, Valid: true},
-		ParticipantID: uuid.NullUUID{UUID: userId, Valid: true},
+		ParticipantID: uuid.NullUUID{UUID: s.currentUserId, Valid: true},
 	})
 
 	respondSimpleMessage("deleted", 204, w)
 }
 
 func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
-
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
 
 	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
 	if err != nil {
@@ -272,7 +245,7 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+	user, _ := s.db.Queries().FindUserById(r.Context(), s.currentUserId )
 
 	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
 	if err != nil {
@@ -301,6 +274,7 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		ChatroomID: uuid.NullUUID{UUID: room.ID, Valid: true},
 		Content:    sql.NullString{String: params.Content, Valid: true},
 	})
+
 	if err != nil {
 		log.Printf("Err creating message: %v", err)
 		respondSimpleMessage("Internal server error", 500, w)
@@ -311,14 +285,6 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
-
-	tokenString, _ := auth.GetBearerToken(r.Header)
-	userId, err := auth.ValidateJWT(tokenString)
-	if err != nil {
-		log.Printf("JWT check Failed: %v", err)
-		respondSimpleMessage("Unauthorized", 401, w)
-		return
-	}
 
 	roomID, err := uuid.Parse(r.PathValue("chatroomID"))
 	if err != nil {
@@ -334,7 +300,7 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
+	user, _ := s.db.Queries().FindUserById(r.Context(), s.currentUserId)
 
 	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/fernandofreamunde/ika/internal/database"
@@ -14,6 +15,7 @@ import (
 
 type Server struct {
 	port int
+	currentUserId uuid.UUID
 
 	db database.Service
 }
