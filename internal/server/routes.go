@@ -3,11 +3,11 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/fernandofreamunde/ika/internal/auth"
+	"github.com/fernandofreamunde/ika/internal/chatroom"
 	"github.com/fernandofreamunde/ika/internal/db"
 	"github.com/fernandofreamunde/ika/internal/user"
 	"github.com/google/uuid"
@@ -186,49 +186,17 @@ func (s *Server) CreateChatroomHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	user, _ := s.db.Queries().FindUserById(r.Context(), userId)
-
-	frienID, err := uuid.Parse(params.FriendID)
-	if err != nil {
-		respondSimpleMessage("Invalid Friend ID.", 400, w)
-		return
-	}
-
-	frien, err := s.db.Queries().FindUserById(r.Context(), frienID)
+	currentUser, _ := user.GetUserById(userId.String(), r.Context(), s.db.Queries)
+	friend, err := user.GetUserById(params.FriendID, r.Context(), s.db.Queries)
 	if err != nil {
 		log.Printf("Err Finding Fren: %v", err)
 		respondSimpleMessage("Friend not found.", 404, w)
 		return
 	}
 
-	room, err := s.db.Queries().CreateChatroom(r.Context(), db.CreateChatroomParams{
-		ID:   uuid.New(),
-		Name: sql.NullString{String: fmt.Sprintf("%s:%s", user.Nickname, frien.Nickname), Valid: true},
-		Type: "direct",
-	})
-
+	room, err := chatroom.CreateChatRoomWithParticipants(currentUser, friend, r.Context(), s.db.Queries) 
 	if err != nil {
-		log.Printf("Err Creating room: %v", err)
-		respondSimpleMessage("Internal Server Error.", 500, w)
-		return
-	}
-
-	err = s.db.Queries().ChatroomAddParticipant(r.Context(), db.ChatroomAddParticipantParams{
-		ChatroomID:    uuid.NullUUID{UUID: room.ID, Valid: true},
-		ParticipantID: uuid.NullUUID{UUID: user.ID, Valid: true},
-	})
-	if err != nil {
-		log.Printf("Err Creating room: %v", err)
-		respondSimpleMessage("Internal Server Error.", 500, w)
-		return
-	}
-
-	err = s.db.Queries().ChatroomAddParticipant(r.Context(), db.ChatroomAddParticipantParams{
-		ChatroomID:    uuid.NullUUID{UUID: room.ID, Valid: true},
-		ParticipantID: uuid.NullUUID{UUID: frien.ID, Valid: true},
-	})
-	if err != nil {
-		log.Printf("Err Creating room: %v", err)
+		log.Printf("Err Creating room with particpants: %v", err)
 		respondSimpleMessage("Internal Server Error.", 500, w)
 		return
 	}
