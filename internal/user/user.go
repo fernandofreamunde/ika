@@ -104,3 +104,24 @@ func CreateUser(params UserParams, ctx context.Context, dbq func() *db.Queries) 
 		UpdatedAt: dbuser.UpdatedAt,
 	}, nil
 }
+
+func GetUserById(id string, ctx context.Context, dbq func() *db.Queries) (User, error)  {
+	
+	userUuid, err := uuid.Parse(id)
+	if err != nil {
+		return User{}, fmt.Errorf("Invalid Friend ID.")
+	}
+
+	dbuser, err := dbq().FindUserById(ctx, userUuid)
+	if err != nil {
+		return User{}, fmt.Errorf("Invalid Friend ID.")
+	}
+
+	return User{
+		ID:        dbuser.ID,
+		Email:     dbuser.Email,
+		Nickname:  dbuser.Nickname,
+		CreatedAt: dbuser.CreatedAt,
+		UpdatedAt: dbuser.UpdatedAt,
+	}, nil
+}
