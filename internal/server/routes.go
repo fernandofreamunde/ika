@@ -258,13 +258,15 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := s.db.Queries().CreateMessage(r.Context(), db.CreateMessageParams{
-		ID:         uuid.New(),
-		Type:       "text",
-		AuthorID:   uuid.NullUUID{UUID: s.currentUserId, Valid: true},
-		ChatroomID: uuid.NullUUID{UUID: roomID, Valid: true},
-		Content:    sql.NullString{String: params.Content, Valid: true},
-	})
+	msg, err := chatroom.SendMessageInChatroom(
+		chatroom.SendMessageParams{
+			AuthorID: s.currentUserId,
+			ChatroomID: roomID,
+			Content: params.Content,
+		}, 
+		r.Context(), 
+		s.db.Queries,
+	)
 
 	if err != nil {
 		log.Printf("Err creating message: %v", err)

@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type SendMessageParams struct {
+	AuthorID uuid.UUID
+	ChatroomID uuid.UUID
+	Content string
+}
+
 func CreateChatRoomWithParticipants(p1, p2 user.User, ctx context.Context, dbq func() *db.Queries) (db.Chatroom, error) {
 	
 	room, err := dbq().CreateChatroom(ctx, db.CreateChatroomParams{
@@ -58,3 +64,21 @@ func IsUserParticipantInChatroom(userId uuid.UUID, chatroomId uuid.UUID, ctx con
 	}
 	return in, nil
 }
+
+func SendMessageInChatroom(params SendMessageParams, ctx context.Context, dbq func() *db.Queries) (db.Message, error) {
+
+	msg, err := dbq().CreateMessage(ctx, db.CreateMessageParams{
+		ID:         uuid.New(),
+		Type:       "text",
+		AuthorID:   uuid.NullUUID{UUID: params.AuthorID, Valid: true},
+		ChatroomID: uuid.NullUUID{UUID: params.ChatroomID, Valid: true},
+		Content:    sql.NullString{String: params.Content, Valid: true},
+	})
+
+	if err != nil {
+		return db.Message{}, fmt.Errorf("Err creating message: %v", err)
+	}
+
+	return msg, nil
+}
+
