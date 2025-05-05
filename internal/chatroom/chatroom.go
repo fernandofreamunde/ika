@@ -41,3 +41,20 @@ func CreateChatRoomWithParticipants(p1, p2 user.User, ctx context.Context, dbq f
 
 	return room, nil
 }
+
+func IsUserParticipantInChatroom(userId uuid.UUID, chatroomId uuid.UUID, ctx context.Context, dbq func() *db.Queries) (bool, error) {
+	
+	room, err := dbq().FindChatRoomById(ctx, chatroomId)
+	if err != nil {
+		return false, err
+	}
+	participants, _ := dbq().FindParticipantIdsByChatRoomId(ctx, uuid.NullUUID{UUID: room.ID, Valid: true})
+
+	in := false
+	for _, p := range participants {
+		if p.ParticipantID.UUID.String() == userId.String() {
+			in = true
+		}
+	}
+	return in, nil
+}

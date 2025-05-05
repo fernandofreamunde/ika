@@ -245,33 +245,24 @@ func (s *Server) CreateMessageHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	user, _ := s.db.Queries().FindUserById(r.Context(), s.currentUserId )
-
-	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
+	isParticipant, err := chatroom.IsUserParticipantInChatroom(s.currentUserId, roomID, r.Context(), s.db.Queries)
 	if err != nil {
-		log.Printf("Err finding room: %v", err)
+		log.Printf("Err getting room participants: %v", err)
 		respondSimpleMessage("Chatroom not found.", 404, w)
 		return
 	}
-	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
 
-	in := false
-	for _, p := range participants {
-		if p.ParticipantID.UUID.String() == user.ID.String() {
-			in = true
-		}
-	}
-	if !in {
+	if !isParticipant {
 		log.Printf("User is not a participant")
-		respondSimpleMessage("Use must participate in the chatroom to send messages", 401, w)
+		respondSimpleMessage("Use must participate in the chatroom to read messages", 401, w)
 		return
 	}
 
 	msg, err := s.db.Queries().CreateMessage(r.Context(), db.CreateMessageParams{
 		ID:         uuid.New(),
 		Type:       "text",
-		AuthorID:   uuid.NullUUID{UUID: user.ID, Valid: true},
-		ChatroomID: uuid.NullUUID{UUID: room.ID, Valid: true},
+		AuthorID:   uuid.NullUUID{UUID: s.currentUserId, Valid: true},
+		ChatroomID: uuid.NullUUID{UUID: roomID, Valid: true},
 		Content:    sql.NullString{String: params.Content, Valid: true},
 	})
 
@@ -300,28 +291,20 @@ func (s *Server) ReadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	params := Parameters{}
 	_ = decoder.Decode(&params)
 
-	user, _ := s.db.Queries().FindUserById(r.Context(), s.currentUserId)
-
-	room, err := s.db.Queries().FindChatRoomById(r.Context(), roomID)
+	isParticipant, err := chatroom.IsUserParticipantInChatroom(s.currentUserId, roomID, r.Context(), s.db.Queries)
 	if err != nil {
-		log.Printf("Err Creating room: %v", err)
+		log.Printf("Err getting room participants: %v", err)
 		respondSimpleMessage("Chatroom not found.", 404, w)
 		return
 	}
-	participants, _ := s.db.Queries().FindParticipantIdsByChatRoomId(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
 
-	in := false
-	for _, p := range participants {
-		if p.ParticipantID.UUID.String() == user.ID.String() {
-			in = true
-		}
-	}
-	if !in {
+	if !isParticipant {
 		log.Printf("User is not a participant")
 		respondSimpleMessage("Use must participate in the chatroom to read messages", 401, w)
 		return
 	}
-	msg, err := s.db.Queries().FindMessagesByRoomById(r.Context(), uuid.NullUUID{UUID: room.ID, Valid: true})
+
+	msg, err := s.db.Queries().FindMessagesByRoomById(r.Context(), uuid.NullUUID{UUID: roomID, Valid: true})
 
 	respondWithJson(msg, 200, w)
 }
